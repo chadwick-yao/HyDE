@@ -609,7 +609,7 @@ type      = "object"
     type        = "integer"
 
 [properties.hyprland.properties.cursor_theme]
-    default     = "Bibata-Modern-Ice"
+    default     = "breeze_cursors"
     description = "Cursor theme."
     type        = "string"
 
