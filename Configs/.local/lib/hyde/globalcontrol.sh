@@ -31,6 +31,76 @@ export themesDir="$THEMES_DIR"
 export fontsDir="$FONTS_DIR"
 export hashMech="sha1sum"
 
+print_log() {
+    # [ -t 1 ] && return 0 # Skip if not in the terminal
+    while (("$#")); do
+        # [ "${colored}" == "true" ]
+        case "$1" in
+        -r | +r)
+            echo -ne "\e[31m$2\e[0m" >&2
+            shift 2
+            ;; # Red
+        -g | +g)
+            echo -ne "\e[32m$2\e[0m" >&2
+            shift 2
+            ;; # Green
+        -y | +y)
+            echo -ne "\e[33m$2\e[0m" >&2
+            shift 2
+            ;; # Yellow
+        -b | +b)
+            echo -ne "\e[34m$2\e[0m" >&2
+            shift 2
+            ;; # Blue
+        -m | +m)
+            echo -ne "\e[35m$2\e[0m" >&2
+            shift 2
+            ;; # Magentass
+        -c | +c)
+            echo -ne "\e[36m$2\e[0m" >&2
+            shift 2
+            ;; # Cyan
+        -wt | +w)
+            echo -ne "\e[37m$2\e[0m" >&2
+            shift 2
+            ;; # White
+        -n | +n)
+            echo -ne "\e[96m$2\e[0m" >&2
+            shift 2
+            ;; # Neon
+        -stat)
+            echo -ne "\e[4;30;46m $2 \e[0m :: " >&2
+            shift 2
+            ;; # status
+        -crit)
+            echo -ne "\e[30;41m $2 \e[0m :: " >&2
+            shift 2
+            ;; # critical
+        -warn)
+            echo -ne "WARNING :: \e[30;43m $2 \e[0m :: " >&2
+            shift 2
+            ;; # warning
+        +)
+            echo -ne "\e[38;5;$2m$3\e[0m" >&2
+            shift 3
+            ;; # Set color manually
+        -sec)
+            echo -ne "\e[32m[$2] \e[0m" >&2
+            shift 2
+            ;; # section use for logs
+        -err)
+            echo -ne "ERROR :: \e[4;31m$2 \e[0m" >&2
+            shift 2
+            ;; #error
+        *)
+            echo -ne "$1" >&2
+            shift
+            ;;
+        esac
+    done
+    echo "" >&2
+}
+
 get_hashmap() {
     unset wallHash
     unset wallList
@@ -248,76 +318,6 @@ set_hash() {
     "${hashMech}" "${hashImage}" | awk '{print $1}'
 }
 
-print_log() {
-    # [ -t 1 ] && return 0 # Skip if not in the terminal
-    while (("$#")); do
-        # [ "${colored}" == "true" ]
-        case "$1" in
-        -r | +r)
-            echo -ne "\e[31m$2\e[0m" >&2
-            shift 2
-            ;; # Red
-        -g | +g)
-            echo -ne "\e[32m$2\e[0m" >&2
-            shift 2
-            ;; # Green
-        -y | +y)
-            echo -ne "\e[33m$2\e[0m" >&2
-            shift 2
-            ;; # Yellow
-        -b | +b)
-            echo -ne "\e[34m$2\e[0m" >&2
-            shift 2
-            ;; # Blue
-        -m | +m)
-            echo -ne "\e[35m$2\e[0m" >&2
-            shift 2
-            ;; # Magentass
-        -c | +c)
-            echo -ne "\e[36m$2\e[0m" >&2
-            shift 2
-            ;; # Cyan
-        -wt | +w)
-            echo -ne "\e[37m$2\e[0m" >&2
-            shift 2
-            ;; # White
-        -n | +n)
-            echo -ne "\e[96m$2\e[0m" >&2
-            shift 2
-            ;; # Neon
-        -stat)
-            echo -ne "\e[4;30;46m $2 \e[0m :: " >&2
-            shift 2
-            ;; # status
-        -crit)
-            echo -ne "\e[30;41m $2 \e[0m :: " >&2
-            shift 2
-            ;; # critical
-        -warn)
-            echo -ne "WARNING :: \e[30;43m $2 \e[0m :: " >&2
-            shift 2
-            ;; # warning
-        +)
-            echo -ne "\e[38;5;$2m$3\e[0m" >&2
-            shift 3
-            ;; # Set color manually
-        -sec)
-            echo -ne "\e[32m[$2] \e[0m" >&2
-            shift 2
-            ;; # section use for logs
-        -err)
-            echo -ne "ERROR :: \e[4;31m$2 \e[0m" >&2
-            shift 2
-            ;; #error
-        *)
-            echo -ne "$1" >&2
-            shift
-            ;;
-        esac
-    done
-    echo "" >&2
-}
-
 check_package() {
 
     local lock_file="${XDG_RUNTIME_DIR:-/tmp}/hyde/__package.lock"
@@ -439,6 +439,7 @@ get_rofi_pos() {
 #? handle pasting
 paste_string() {
     if ! command -v wtype >/dev/null; then exit 0; fi
+    if [ -t 0 ] || [ -t 1 ]; then return 0; fi
     ignore_paste_file="$HYDE_STATE_HOME/ignore.paste"
 
     if [[ ! -e "${ignore_paste_file}" ]]; then
@@ -453,7 +454,7 @@ EOF
     fi
 
     ignore_class=$(echo "$@" | awk -F'--ignore=' '{print $2}')
-    [ -n "${ignore_class}" ] && echo "${ignore_class}" >>"${ignore_paste_file}" && print_prompt -y "[ignore]" "'$ignore_class'" && exit 0
+    [ -n "${ignore_class}" ] && echo "${ignore_class}" >>"${ignore_paste_file}" && print_log -y "[ignore]" "'$ignore_class'" && exit 0
     class=$(hyprctl -j activewindow | jq -r '.initialClass')
     if ! grep -q "${class}" "${ignore_paste_file}"; then
         hyprctl -q dispatch exec 'wtype -M ctrl V -m ctrl'
@@ -514,7 +515,7 @@ accepted_mime_types() {
         if file --mime-type -b "${file}" | grep -q "^${mime_type}"; then
             return 0
         else
-            print_log err "File type not supported for this wallpaper backend."
+            print_log -err "File type not supported for this wallpaper backend."
             notify-send -u critical -a "HyDE-Alert" "File type not supported for this wallpaper backend."
         fi
 

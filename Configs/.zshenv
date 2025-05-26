@@ -38,8 +38,8 @@ function command_not_found_handler {
     return 127
 }
 
-function load_zsh_plugins {
-    unset -f load_zsh_plugins
+function _load_zsh_plugins {
+    unset -f _load_zsh_plugins
     # Oh-my-zsh installation path
     zsh_paths=(
         "$HOME/.oh-my-zsh"
@@ -59,7 +59,7 @@ function load_zsh_plugins {
 
 # Function to display a slow load warning
 # the intention is for hyprdots users who might have multiple zsh initialization
-function slow_load_warning {
+function _slow_load_warning {
     local lock_file="/tmp/.hyde_slow_load_warning.lock"
     local load_time=$SECONDS
 
@@ -105,9 +105,10 @@ function no_such_file_or_directory_handler {
     return 127
 }
 
-function load_persistent_aliases {
-    #! Persistent Aliases are loaded after zshrc is loaded you cannot overwrite them
-    unset -f load_persistent_aliases
+function _load_persistent_aliases {
+    # Persistent aliases are loaded after the plugin is loaded
+    # This way omz will not override them
+    unset -f _load_persistent_aliases
 
     if [[ -x "$(command -v eza)" ]]; then
         alias l='eza -lh --icons=auto' \
@@ -118,23 +119,114 @@ function load_persistent_aliases {
 
 }
 
-# Load oh-my-zsh when line editor initializes // before user input
-function load_omz_on_init() {
+function _load_omz_on_init() {
+    # Load oh-my-zsh when line editor initializes // before user input
     if [[ -n $DEFER_OMZ_LOAD ]]; then
         unset DEFER_OMZ_LOAD
         [[ -r $ZSH/oh-my-zsh.sh ]] && source $ZSH/oh-my-zsh.sh
-
-        load_persistent_aliases
+        ZDOTDIR="${__ZDOTDIR:-$HOME}"
+        _load_post_init
     fi
 }
 
-function load_if_terminal {
+# best fzf aliases ever
+_fuzzy_change_directory() {
+    local initial_query="$1"
+    local selected_dir
+    local fzf_options=('--preview=ls -p {}' '--preview-window=right:60%')
+    fzf_options+=(--height "80%" --layout=reverse --preview-window right:60% --cycle)
+    local max_depth=7
+
+    if [[ -n "$initial_query" ]]; then
+        fzf_options+=("--query=$initial_query")
+    fi
+
+    #type -d
+    selected_dir=$(find . -maxdepth $max_depth \( -name .git -o -name node_modules -o -name .venv -o -name target -o -name .cache \) -prune -o -type d -print 2>/dev/null | fzf "${fzf_options[@]}")
+
+    if [[ -n "$selected_dir" && -d "$selected_dir" ]]; then
+        cd "$selected_dir" || return 1
+    else
+        return 1
+    fi
+}
+
+_fuzzy_edit_search_file_content() {
+    # [f]uzzy [e]dit  [s]earch [f]ile [c]ontent
+    local selected_file
+    selected_file=$(grep -irl "${1:-}" ./ | fzf --height "80%" --layout=reverse --preview-window right:60% --cycle --preview 'cat {}' --preview-window right:60%)
+
+    if [[ -n "$selected_file" ]]; then
+        if command -v "$EDITOR" &>/dev/null; then
+            "$EDITOR" "$selected_file"
+        else
+            echo "EDITOR is not specified. using vim.  (you can export EDITOR in ~/.zshrc)"
+            vim "$selected_file"
+        fi
+
+    else
+        echo "No file selected or search returned no results."
+    fi
+}
+
+_fuzzy_edit_search_file() {
+    local initial_query="$1"
+    local selected_file
+    local fzf_options=()
+    fzf_options+=(--height "80%" --layout=reverse --preview-window right:60% --cycle)
+    local max_depth=5
+
+    if [[ -n "$initial_query" ]]; then
+        fzf_options+=("--query=$initial_query")
+    fi
+
+    # -type f: only find files
+    selected_file=$(find . -maxdepth $max_depth -type f 2>/dev/null | fzf "${fzf_options[@]}")
+
+    if [[ -n "$selected_file" && -f "$selected_file" ]]; then
+        if command -v "$EDITOR" &>/dev/null; then
+            "$EDITOR" "$selected_file"
+        else
+            echo "EDITOR is not specified. using vim.  (you can export EDITOR in ~/.zshrc)"
+            vim "$selected_file"
+        fi
+    else
+        return 1
+    fi
+}
+
+function _load_post_init() {
+    #! Never load time consuming functions here
+    _load_persistent_aliases
+    autoload -U compinit && compinit
+
+    # Load hydectl completion
+    if command -v hydectl &>/dev/null; then
+        compdef _hydectl hydectl
+        eval "$(hydectl completion zsh)"
+    fi
+
+    # Initiate fzf
+    if command -v fzf &>/dev/null; then
+        eval "$(fzf --zsh)"
+    fi
+
+    # zsh-autosuggestions won't work on first prompt when deferred
+    if typeset -f _zsh_autosuggest_start > /dev/null; then
+      _zsh_autosuggest_start
+    fi
+
+    # User rc file always overrides
+    [[ -f $HOME/.zshrc ]] && source $HOME/.zshrc
+
+}
+
+function _load_if_terminal {
     if [ -t 1 ]; then
 
-        unset -f load_if_terminal
+        unset -f _load_if_terminal
 
         # Currently We are loading Starship and p10k prompts on start so users can see the prompt immediately
-        # You can remove either starship or p10k to slightly improve start time
 
         if command -v starship &>/dev/null; then
             # ===== START Initialize Starship prompt =====
@@ -142,26 +234,34 @@ function load_if_terminal {
             export STARSHIP_CACHE=$XDG_CACHE_HOME/starship
             export STARSHIP_CONFIG=$XDG_CONFIG_HOME/starship/starship.toml
         # ===== END Initialize Starship prompt =====
-        elif [ -r ~/.p10k.zsh ]; then
+        elif [ -r $HOME/.p10k.zsh ]; then
             # ===== START Initialize Powerlevel10k theme =====
             POWERLEVEL10K_TRANSIENT_PROMPT=same-dir
             P10k_THEME=${P10k_THEME:-/usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme}
             [[ -r $P10k_THEME ]] && source $P10k_THEME
-            # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh
-            [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+            # To customize prompt, run `p10k configure` or edit $HOME/.p10k.zsh
+            [[ ! -f $HOME/.p10k.zsh ]] || source $HOME/.p10k.zsh
         # ===== END Initialize Powerlevel10k theme =====
         fi
 
         # Optionally load user configuration // useful for customizing the shell without modifying the main file
-        [[ -f ~/.hyde.zshrc ]] && source ~/.hyde.zshrc
+        if [[ -f $HOME/.hyde.zshrc ]]; then
+            source $HOME/.hyde.zshrc # for backward compatibility
+        elif [[ -f $HOME/.user.zsh ]]; then
+            source $HOME/.user.zsh # renamed to .user.zsh for intuitiveness that it is a user config
+        fi
 
         # Load plugins
-        load_zsh_plugins
+        _load_zsh_plugins
 
         # Load zsh hooks module once
 
         #? Methods to load oh-my-zsh lazily
-        zle -N zle-line-init load_omz_on_init # Loads when the line editor initializes // The best option
+        __ZDOTDIR="${ZDOTDIR:-$HOME}"
+        ZDOTDIR=/tmp
+        zle -N zle-line-init _load_omz_on_init # Loads when the line editor initializes // The best option
+
+        #  Below this line are the commands that are executed after the prompt appears
 
         autoload -Uz add-zsh-hook
         # add-zsh-hook zshaddhistory load_omz_deferred # loads after the first command is added to history
@@ -174,7 +274,7 @@ function load_if_terminal {
         # po='yay -Qtdq | ${PM_COMMAND[@]} -Rns -' # remove orphaned packages
 
         # Warn if the shell is slow to load
-        add-zsh-hook -Uz precmd slow_load_warning
+        add-zsh-hook -Uz precmd _slow_load_warning
 
         alias c='clear' \
             in='${PM_COMMAND[@]} install' \
@@ -189,11 +289,20 @@ function load_if_terminal {
             .3='cd ../../..' \
             .4='cd ../../../..' \
             .5='cd ../../../../..' \
-            mkdir='mkdir -p' # Always mkdir a path (this doesn't inhibit functionality to make a single dir)
+            mkdir='mkdir -p' \
+            ffec='_fuzzy_edit_search_file_content' \
+            ffcd='_fuzzy_change_directory' \
+            ffe='_fuzzy_edit_search_file'
+
+        # Some binds won't work on first prompt when deferred
+        bindkey '\e[H' beginning-of-line
+        bindkey '\e[F' end-of-line
 
     fi
 
 }
+
+#? Override this environment variable in ~/.zshrc
 
 # cleaning up home folder
 PATH="$HOME/.local/bin:$PATH"
@@ -219,7 +328,17 @@ PARALLEL_HOME="$XDG_CONFIG_HOME/parallel"
 SCREENRC="$XDG_CONFIG_HOME"/screen/screenrc
 
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+
+# History configuration // explicit to not nuke history
 HISTFILE=${HISTFILE:-$HOME/.zsh_history}
+HISTSIZE=10000
+SAVEHIST=10000
+setopt EXTENDED_HISTORY       # Write the history file in the ':start:elapsed;command' format
+setopt INC_APPEND_HISTORY     # Write to the history file immediately, not when the shell exits
+setopt SHARE_HISTORY          # Share history between all sessions
+setopt HIST_EXPIRE_DUPS_FIRST # Expire a duplicate event first when trimming history
+setopt HIST_IGNORE_DUPS       # Do not record an event that was just recorded again
+setopt HIST_IGNORE_ALL_DUPS   # Delete an old recorded event if a new event is a duplicate
 
 # HyDE Package Manager
 PM_COMMAND=(hyde-shell pm)
@@ -230,4 +349,4 @@ export XDG_CONFIG_HOME XDG_CONFIG_DIR XDG_DATA_HOME XDG_STATE_HOME \
     XDG_MUSIC_DIR XDG_PICTURES_DIR XDG_VIDEOS_DIR \
     SCREENRC ZSH_AUTOSUGGEST_STRATEGY HISTFILE
 
-load_if_terminal
+_load_if_terminal

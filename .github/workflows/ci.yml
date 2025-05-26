@@ -20,70 +20,50 @@ jobs:
       - name: Generate commit history and schedule
         id: generate-commits
         run: |
-          # Get the commit history between master and dev in conventional commit format
-          COMMIT_LIST=$(git log --pretty=format:"* %s (%h) by %an" origin/master..dev | 
-            while IFS= read -r line; do
-              if [[ ! $line =~ ^"* feat"* && ! $line =~ ^"* fix"* && ! $line =~ ^"* docs"* ]]; then
-                echo "* chore${line:1}"
-              else
-                echo "$line"
-              fi
-            done)
+          chmod +x .github/scripts/promote_to_master.sh
+          bash .github/scripts/promote_to_master.sh
 
-          # Handle empty commit list (branches are identical)
-          if [ -z "$COMMIT_LIST" ]; then
-            COMMIT_LIST="No new commits - branches may be identical"
+      # Check if there are any commits between master and dev
+      - name: Check for commits between branches
+        id: check-commits
+        run: |
+          # Fetch master branch to make sure it exists locally
+          git fetch origin master:master || true
+
+          # We're already on dev branch since the job runs when dev is pushed
+          # Compare dev to master to see if there are any differences
+          if git rev-parse --verify master >/dev/null 2>&1; then
+            COMMIT_COUNT=$(git rev-list --count master..dev)
+            echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+            if [ "$COMMIT_COUNT" -gt 0 ]; then
+              echo "Detected $COMMIT_COUNT commit(s) between master and dev"
+              echo "has_commits=true" >> $GITHUB_OUTPUT
+            else
+              echo "No commits detected between master and dev"
+              echo "has_commits=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Master branch doesn't exist yet. Assuming changes need to be propagated."
+            echo "commit_count=999" >> $GITHUB_OUTPUT  # Use a high number to indicate there are changes
+            echo "has_commits=true" >> $GITHUB_OUTPUT
           fi
 
-          # Calculate suggested merge date based on release policy
-          # By default, suggesting next Monday as merge date - adjust according to your policy
-          MERGE_DATE="Friday"
-
-          # Save commit list to a file (to handle multi-line output)
-          echo "$COMMIT_LIST" > commit_list.txt
-
-          # Create a PR body with the commit list and suggested merge date
-          echo "PR_BODY<<EOF" >> $GITHUB_ENV
-          echo "This is an automated PR to promote changes from \`dev\` to \`master\`." >> $GITHUB_ENV
-          echo "Please review and test before merging." >> $GITHUB_ENV
-          echo "" >> $GITHUB_ENV
-          echo "## For Testers" >> $GITHUB_ENV
-          echo "See [TESTING.md](./TESTING.md) for complete testing instructions." >> $GITHUB_ENV
-          echo "" >> $GITHUB_ENV
-          echo "## Suggested Merge Schedule" >> $GITHUB_ENV
-          echo "According to our release policy, this PR is expected to be merged on: **$MERGE_DATE**" >> $GITHUB_ENV
-          echo "Testers are encouraged to test the changes before merging." >> $GITHUB_ENV
-          echo "Please note that this schedule may be adjusted based on the needs of the project." >> $GITHUB_ENV
-          echo "## Commits to be merged:" >> $GITHUB_ENV
-          echo "---" >> $GITHUB_ENV
-          cat commit_list.txt >> $GITHUB_ENV
-          echo "---" >> $GITHUB_ENV
-          echo "" >> $GITHUB_ENV
-          echo "Please review the changes carefully before merging." >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-      # Use a fixed branch name for the PR
-      - name: Update dev-to-master branch
+      # Set up git for potential operations
+      - name: Setup git
+        if: steps.check-commits.outputs.has_commits == 'true'
         run: |
-          # Setup git
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
 
-          # Use a fixed branch name for consistency
-          BRANCH_NAME="automated-dev-to-master-branch"
-
-          # Force-push current dev state to the fixed branch
-          git checkout -b $BRANCH_NAME
-          git push --force origin $BRANCH_NAME
-
       # Create or update PR using GitHub API with retry logic
       - name: Create or Update Pull Request
+        if: steps.check-commits.outputs.has_commits == 'true'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { repo, owner } = context.repo;
-            const prBranch = "automated-dev-to-master-branch";
+            const prBranch = "dev";
             const prTitle = "chore: release automated changes from dev to master";
             const prBody = process.env.PR_BODY;
 
@@ -151,6 +131,13 @@ jobs:
                 throw error;
               }
             }
+
+      # Output message when no commits are found
+      - name: No Commits Message
+        if: steps.check-commits.outputs.has_commits == 'false'
+        run: |
+          echo "::notice::No new commits detected between master and dev branches. Skipping PR creation."
+          echo "The branches master and dev are already in sync."
 
   release:
     name: release
