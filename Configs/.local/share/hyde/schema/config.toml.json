@@ -377,8 +377,13 @@
                     "type": "string"
                 },
                 "scale": {
-                    "default": 30,
+                    "default": 10,
                     "description": "Total scaling for waybar.",
+                    "type": "integer"
+                },
+                "icon_size": {
+                    "default": 10,
+                    "description": "Icon size for waybar.",
                     "type": "integer"
                 }
             }
@@ -651,6 +656,11 @@
                     "description": "Terminal.",
                     "type": "string"
                 },
+                "quickapps": {
+                    "default": "kitty",
+                    "description": "Quick apps.",
+                    "type": "string"
+                },
                 "bar": {
                     "default": "waybar",
                     "description": "Bar.",
@@ -679,6 +689,11 @@
                 "cursor_theme": {
                     "default": "breeze_cursors",
                     "description": "Cursor theme.",
+                    "type": "string"
+                },
+                "button_layout": {
+                    "default": "",
+                    "description": "Button layout. (gtk only)",
                     "type": "string"
                 },
                 "document_font_size": {
@@ -715,6 +730,11 @@
                     "default": 9,
                     "description": "Monospace font size.",
                     "type": "integer"
+                },
+                "background_path": {
+                    "default": "",
+                    "description": "LockScreen's Background path.",
+                    "type": "string"
                 }
             }
         },
@@ -733,7 +753,7 @@
                     "type": "string"
                 },
                 "bar": {
-                    "default": "$BAR",
+                    "default": "hyde-shell waybar --watch",
                     "description": "Bar.",
                     "type": "string"
                 },
@@ -816,6 +836,11 @@
                 "standby_text": {
                     "default": "\uf001  Music",
                     "description": "To display on standby.",
+                    "type": "string"
+                },
+                "artist_track_separator": {
+                    "default": "\u2004\uf444 ",
+                    "description": "Separator symbols to display between artist and track.",
                     "type": "string"
                 }
             }
