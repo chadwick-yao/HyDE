@@ -108,6 +108,38 @@
                             "default": 5,
                             "description": "Scaling for launch.",
                             "type": "integer"
+                        },
+                        "drun_args": {
+                            "default": [],
+                            "description": "Additional arguments for drun mode.",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "run_args": {
+                            "default": [],
+                            "description": "Additional arguments for run mode.",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "window_args": {
+                            "default": [],
+                            "description": "Additional arguments for window mode.",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "filebrowser_args": {
+                            "default": [],
+                            "description": "Additional arguments for filebrowser mode.",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
                         }
                     }
                 },

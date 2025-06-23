@@ -13,7 +13,7 @@ fi
 
 # shellcheck disable=SC2154
 if chk_list "aurhlpr" "${aurList[@]}"; then
-    print_log -sec "AUR" -stat "detected" "${aurhlpr}"
+    print_log -sec "AUR" -stat "Detected" "${aurhlpr}"
     exit 0
 fi
 

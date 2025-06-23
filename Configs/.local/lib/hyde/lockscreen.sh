@@ -5,4 +5,9 @@ scrDir="$(dirname "$(realpath "$0")")"
 # shellcheck disable=SC1091
 source "${scrDir}/globalcontrol.sh"
 
-"${LOCKSCREEN:-hyprlock}" "${@}"
+lockscreen="${LOCKSCREEN:-hyprlock}"
+
+if ! hyde-shell "${lockscreen}.sh" "${@}" ; then
+    printf "Executing raw command: %s\n" "${lockscreen}"
+    "${lockscreen}" "${@}"
+fi

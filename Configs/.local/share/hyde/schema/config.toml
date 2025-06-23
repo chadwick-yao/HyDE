@@ -111,6 +111,38 @@ type      = "object"
     description = "Scaling for launch."
     type        = "integer"
 
+[properties.rofi.properties.launch.properties.drun_args]
+    default     = [  ]
+    description = "Additional arguments for drun mode."
+    type        = "array"
+
+[properties.rofi.properties.launch.properties.drun_args.items]
+    type = "string"
+
+[properties.rofi.properties.launch.properties.run_args]
+    default     = [  ]
+    description = "Additional arguments for run mode."
+    type        = "array"
+
+[properties.rofi.properties.launch.properties.run_args.items]
+    type = "string"
+
+[properties.rofi.properties.launch.properties.window_args]
+    default     = [  ]
+    description = "Additional arguments for window mode."
+    type        = "array"
+
+[properties.rofi.properties.launch.properties.window_args.items]
+    type = "string"
+
+[properties.rofi.properties.launch.properties.filebrowser_args]
+    default     = [  ]
+    description = "Additional arguments for filebrowser mode."
+    type        = "array"
+
+[properties.rofi.properties.launch.properties.filebrowser_args.items]
+    type = "string"
+
 [properties.rofi.properties.cliphist]
     description = "cliphist.sh configuration."
     type        = "object"
